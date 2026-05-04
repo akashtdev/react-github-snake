@@ -1,7 +1,7 @@
 # react-github-snake
 
 <div align="center">
-  <video src="https://akashtdev.github.io/react-github-snake/react-github-snake.mp4" width="100%" autoplay loop muted playsinline></video>
+  <video src="https://github.com/user-attachments/assets/7c9f9fbd-b79e-491c-9cd1-ab0a6b228fd1" width="100%" autoplay loop muted playsinline></video>
 </div>
 
 [![NPM Version](https://img.shields.io/npm/v/react-github-snake)](https://www.npmjs.com/package/react-github-snake)

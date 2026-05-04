@@ -1,6 +1,6 @@
 {
   "name": "react-github-snake",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "An interactive GitHub contribution snake game for React with automated pathfinding.",
   "type": "module",
   "main": "./dist/index.cjs",
