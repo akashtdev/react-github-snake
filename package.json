@@ -1,0 +1,79 @@
+{
+  "name": "react-github-snake",
+  "version": "1.0.0",
+  "description": "An interactive GitHub contribution snake game for React with automated pathfinding.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./style.css": "./dist/index.css"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "sideEffects": ["*.css"],
+  "scripts": {
+    "dev": "vite",
+    "build": "tsup",
+    "build:demo": "vite build",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "preview": "vite preview",
+    "check": "biome check --write .",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist dist-demo",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "react": ">=19.0.0",
+    "react-dom": ">=19.0.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "@vitest/coverage-v8": "^4.1.4",
+    "happy-dom": "^20.9.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.2.2",
+    "vite": "^5.2.0",
+    "vitest": "^4.1.4"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "react",
+    "github",
+    "heatmap",
+    "snake",
+    "contribution",
+    "zero-dependency",
+    "interactive",
+    "game",
+    "component"
+  ],
+  "author": "akashtdev",
+  "license": "MIT",
+  "homepage": "https://github.com/akashtdev/react-github-snake#readme",
+  "bugs": {
+    "url": "https://github.com/akashtdev/react-github-snake/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/akashtdev/react-github-snake.git"
+  }
+}
