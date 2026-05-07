@@ -1,5 +1,15 @@
 import type { Direction, Position } from '../types';
 
+export type CellData = { cell?: HTMLElement; x: number; y: number; level?: number };
+
+const ALL_DIRS: Direction[] = ['UP', 'DOWN', 'LEFT', 'RIGHT'];
+const OPPOSITES: Record<Direction, Direction> = {
+  UP: 'DOWN',
+  DOWN: 'UP',
+  LEFT: 'RIGHT',
+  RIGHT: 'LEFT',
+};
+
 export function getNextPosition(head: Position, dir: Direction): Position {
   switch (dir) {
     case 'UP':
@@ -13,83 +23,186 @@ export function getNextPosition(head: Position, dir: Direction): Position {
   }
 }
 
-export type CellData = { cell: HTMLElement; x: number; y: number };
+export function resolvePosition(
+  pos: Position,
+  w: number,
+  h: number,
+  walls: boolean
+): Position | null {
+  if (walls) {
+    if (pos.x < 0 || pos.x >= w || pos.y < 0 || pos.y >= h) return null;
+    return pos;
+  }
+  return {
+    x: ((pos.x % w) + w) % w,
+    y: ((pos.y % h) + h) % h,
+  };
+}
+
+function floodFillSize(
+  start: Position,
+  blocked: Set<string>,
+  w: number,
+  h: number,
+  walls: boolean
+): number {
+  const visited = new Set<string>();
+  const queue: Position[] = [start];
+  const startKey = `${start.x}-${start.y}`;
+  if (blocked.has(startKey)) return 0;
+  visited.add(startKey);
+
+  while (queue.length > 0) {
+    const cur = queue.shift();
+    if (!cur) break;
+    for (const dir of ALL_DIRS) {
+      const raw = getNextPosition(cur, dir);
+      const resolved = resolvePosition(raw, w, h, walls);
+      if (!resolved) continue;
+      const key = `${resolved.x}-${resolved.y}`;
+      if (visited.has(key) || blocked.has(key)) continue;
+      visited.add(key);
+      queue.push(resolved);
+    }
+  }
+  return visited.size;
+}
+
+function exploreNeighbors(
+  pos: Position,
+  dist: number,
+  targetKey: string,
+  visited: Set<string>,
+  blocked: Set<string>,
+  w: number,
+  h: number,
+  walls: boolean,
+  queue: { pos: Position; dist: number }[]
+): number | null {
+  for (const dir of ALL_DIRS) {
+    const next = resolvePosition(getNextPosition(pos, dir), w, h, walls);
+    if (!next) continue;
+    const key = `${next.x}-${next.y}`;
+    if (key === targetKey) return dist + 1;
+    if (!visited.has(key) && !blocked.has(key)) {
+      visited.add(key);
+      queue.push({ pos: next, dist: dist + 1 });
+    }
+  }
+  return null;
+}
+
+function bfsDistance(
+  start: Position,
+  target: Position,
+  blocked: Set<string>,
+  w: number,
+  h: number,
+  walls: boolean
+): number {
+  const targetKey = `${target.x}-${target.y}`;
+  if (`${start.x}-${start.y}` === targetKey) return 0;
+
+  const visited = new Set<string>();
+  const queue: { pos: Position; dist: number }[] = [{ pos: start, dist: 0 }];
+  visited.add(`${start.x}-${start.y}`);
+
+  while (queue.length > 0) {
+    const item = queue.shift();
+    if (!item) break;
+    const res = exploreNeighbors(
+      item.pos,
+      item.dist,
+      targetKey,
+      visited,
+      blocked,
+      w,
+      h,
+      walls,
+      queue
+    );
+    if (res !== null) return res;
+  }
+  return Number.POSITIVE_INFINITY;
+}
 
 export function getTargetContribution(
   cellsMap: Map<string, CellData>,
-  head: Position
+  snake: Position[],
+  w: number,
+  h: number,
+  walls: boolean
 ): Position | null {
-  if (!cellsMap || cellsMap.size === 0 || !head) return null;
+  const blocked = new Set(snake.map((p) => `${p.x}-${p.y}`));
+  const head = snake[0];
+  let best: Position | null = null;
+  let bestDist = Number.POSITIVE_INFINITY;
 
-  let closest: Position | null = null;
-  let minDistance = Number.POSITIVE_INFINITY;
+  for (const cell of cellsMap.values()) {
+    const cellEl = cell.cell;
+    const isTarget = cellEl
+      ? !cellEl.classList.contains('level-0') &&
+        !cellEl.classList.contains('snake-body') &&
+        !cellEl.classList.contains('snake-head')
+      : (cell.level ?? 0) > 0;
 
-  for (const { cell, x, y } of cellsMap.values()) {
-    if (
-      !cell.classList.contains('level-0') &&
-      !cell.classList.contains('snake-body') &&
-      !cell.classList.contains('snake-head')
-    ) {
-      const dist = Math.abs(x - head.x) + Math.abs(y - head.y);
-      if (dist < minDistance) {
-        minDistance = dist;
-        closest = { x, y };
+    if (isTarget && !blocked.has(`${cell.x}-${cell.y}`)) {
+      const dist = bfsDistance(head, { x: cell.x, y: cell.y }, blocked, w, h, walls);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = { x: cell.x, y: cell.y };
       }
+      if (bestDist === 1) break;
     }
   }
-
-  return closest;
+  return best;
 }
 
-function isOpposite(d1: Direction, d2: Direction): boolean {
-  return (
-    (d1 === 'UP' && d2 === 'DOWN') ||
-    (d1 === 'DOWN' && d2 === 'UP') ||
-    (d1 === 'LEFT' && d2 === 'RIGHT') ||
-    (d1 === 'RIGHT' && d2 === 'LEFT')
-  );
-}
-
-function wrapPosition(pos: Position, width: number, height: number): Position {
-  return {
-    x: pos.x < 0 ? width - 1 : pos.x >= width ? 0 : pos.x,
-    y: pos.y < 0 ? height - 1 : pos.y >= height ? 0 : pos.y,
-  };
+interface Candidate {
+  dir: Direction;
+  pos: Position;
+  dist: number;
+  space: number;
 }
 
 export function getAutoDirection(
   head: Position,
-  target: Position | null,
+  target: Position,
   currentDir: Direction,
   snake: Position[],
   walls: boolean,
-  width: number,
-  height: number
+  w: number,
+  h: number
 ): Direction {
-  if (!target || !head || !snake || width <= 0 || height <= 0) return currentDir;
+  const blocked = new Set(snake.map((p) => `${p.x}-${p.y}`));
+  const candidates: Candidate[] = [];
 
-  const possibleDirs: Direction[] = ['UP', 'DOWN', 'LEFT', 'RIGHT'];
-  const scoredMoves: { dir: Direction; score: number }[] = [];
-
-  for (const dir of possibleDirs) {
-    if (isOpposite(dir, currentDir)) continue;
-
-    let next = getNextPosition(head, dir);
-
-    if (walls) {
-      if (next.x < 0 || next.x >= width || next.y < 0 || next.y >= height) continue;
-    } else {
-      next = wrapPosition(next, width, height);
+  for (const dir of ALL_DIRS) {
+    if (dir === OPPOSITES[currentDir] && snake.length > 1) continue;
+    const raw = getNextPosition(head, dir);
+    const resolved = resolvePosition(raw, w, h, walls);
+    if (resolved && !blocked.has(`${resolved.x}-${resolved.y}`)) {
+      candidates.push({
+        dir,
+        pos: resolved,
+        dist: Math.abs(target.x - resolved.x) + Math.abs(target.y - resolved.y),
+        space: floodFillSize(resolved, blocked, w, h, walls),
+      });
     }
-
-    if (snake.some((s) => s.x === next.x && s.y === next.y)) continue;
-
-    const dist = Math.abs(target.x - next.x) + Math.abs(target.y - next.y);
-    scoredMoves.push({ dir, score: 1000 - dist });
   }
 
-  if (scoredMoves.length === 0) return currentDir;
+  if (candidates.length === 0) {
+    for (const dir of ALL_DIRS) {
+      const raw = getNextPosition(head, dir);
+      const resolved = resolvePosition(raw, w, h, walls);
+      if (resolved && !blocked.has(`${resolved.x}-${resolved.y}`)) return dir;
+    }
+    return currentDir;
+  }
 
-  scoredMoves.sort((a, b) => b.score - a.score);
-  return scoredMoves[0].dir;
+  const minSpace = Math.min(snake.length, w * h * 0.3);
+  const safe = candidates.filter((c) => c.space >= minSpace);
+  const pool = safe.length > 0 ? safe : candidates;
+
+  return pool.sort((a, b) => a.dist - b.dist)[0].dir;
 }

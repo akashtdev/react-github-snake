@@ -15,14 +15,12 @@ const INITIAL_SNAKE: Position[] = [
   { x: 3, y: 3 },
 ];
 const INITIAL_DIRECTION: Direction = 'RIGHT';
-
 const KEYS_MAP: Record<string, Direction> = {
   ArrowUp: 'UP',
   ArrowDown: 'DOWN',
   ArrowLeft: 'LEFT',
   ArrowRight: 'RIGHT',
 };
-
 const OPPOSITES: Record<Direction, Direction> = {
   UP: 'DOWN',
   DOWN: 'UP',
@@ -30,17 +28,14 @@ const OPPOSITES: Record<Direction, Direction> = {
   RIGHT: 'LEFT',
 };
 
-function isCollision(head: Position, snake: Position[]): boolean {
-  return snake.some((segment) => segment.x === head.x && segment.y === head.y);
+function parseCellCoordinates(htmlEl: HTMLElement): { x: number; y: number } | null {
+  const x = Number.parseInt(htmlEl.getAttribute('data-x') || '', 10);
+  const y = Number.parseInt(htmlEl.getAttribute('data-y') || '', 10);
+  if (Number.isNaN(x) || Number.isNaN(y)) return null;
+  return { x, y };
 }
 
-function isOutOfBounds(head: Position, width: number, height: number): boolean {
-  return head.x < 0 || head.x >= width || head.y < 0 || head.y >= height;
-}
-
-export function useSnakeEngine(boardRef: React.RefObject<HTMLDivElement | null>): {
-  snakeRef: React.MutableRefObject<Position[]>;
-} {
+export function useSnakeEngine(boardRef: React.RefObject<HTMLDivElement | null>) {
   const {
     gameState,
     mode,
@@ -64,202 +59,208 @@ export function useSnakeEngine(boardRef: React.RefObject<HTMLDivElement | null>)
   const savedGridStateRef = useRef<Map<string, string>>(new Map());
   const cellsMapRef = useRef<Map<string, CellData>>(new Map());
 
-  const ensureCellsCache = useCallback((): void => {
-    if (cellsMapRef.current.size > 0 || !boardRef.current) return;
-    const cells = Array.from(
-      boardRef.current.querySelectorAll('.github-snake-cell')
-    ) as HTMLElement[];
-    for (const el of cells) {
-      const x = Number.parseInt(el.getAttribute('data-x') || '', 10);
-      const y = Number.parseInt(el.getAttribute('data-y') || '', 10);
-      if (!Number.isNaN(x) && !Number.isNaN(y)) {
-        cellsMapRef.current.set(`${x}-${y}`, { cell: el, x, y });
-      }
-    }
-  }, [boardRef]);
+  useEffect(() => {
+    cellsMapRef.current.clear();
+    savedGridStateRef.current.clear();
+  }, []);
 
-  const clearSnakeDOM = useCallback((): void => {
+  const ensureCellsCache = useCallback(() => {
+    const mapSize = cellsMapRef.current.size;
+    const firstCell = mapSize > 0 ? cellsMapRef.current.values().next().value?.cell : null;
+    const isDetached = mapSize > 0 && (!firstCell || !document.contains(firstCell));
+    const needsRebuild = mapSize === 0 || mapSize !== boardWidth * boardHeight || isDetached;
+
+    if (!needsRebuild) return;
+
+    cellsMapRef.current.clear();
+    if (!boardRef.current) return;
+
+    const cells = boardRef.current.querySelectorAll('.github-snake-cell');
+    for (const el of cells) {
+      const htmlEl = el as HTMLElement;
+      const coords = parseCellCoordinates(htmlEl);
+      if (coords) cellsMapRef.current.set(`${coords.x}-${coords.y}`, { cell: htmlEl, ...coords });
+    }
+  }, [boardRef, boardWidth, boardHeight]);
+
+  const clearSnakeDOM = useCallback(() => {
     ensureCellsCache();
     for (const { cell } of cellsMapRef.current.values()) {
-      cell.classList.remove('snake-body', 'snake-head');
+      if (cell) cell.classList.remove('snake-body', 'snake-head');
     }
   }, [ensureCellsCache]);
 
-  const drawState = useCallback((): void => {
+  const drawState = useCallback(() => {
     ensureCellsCache();
     clearSnakeDOM();
-    snakeRef.current.forEach((segment, index) => {
+    snakeRef.current.forEach((segment, i) => {
       const cellData = cellsMapRef.current.get(`${segment.x}-${segment.y}`);
-      if (cellData) {
-        cellData.cell.classList.add(index === 0 ? 'snake-head' : 'snake-body');
+      if (cellData?.cell) {
+        cellData.cell.classList.add(i === 0 ? 'snake-head' : 'snake-body');
       }
     });
   }, [clearSnakeDOM, ensureCellsCache]);
 
-  const restoreGrid = useCallback((): void => {
+  const restoreGrid = useCallback(() => {
     ensureCellsCache();
-    for (const [key, { cell }] of cellsMapRef.current.entries()) {
-      const savedClass = savedGridStateRef.current.get(key);
-      if (savedClass) cell.className = `github-snake-cell ${savedClass}`;
-    }
+    cellsMapRef.current.forEach(({ cell }, key) => {
+      const saved = savedGridStateRef.current.get(key);
+      if (saved && cell) cell.className = `github-snake-cell ${saved}`;
+    });
   }, [ensureCellsCache]);
 
-  const saveGrid = useCallback((): void => {
+  const saveGrid = useCallback(() => {
     ensureCellsCache();
     savedGridStateRef.current.clear();
-    for (const [key, { cell }] of cellsMapRef.current.entries()) {
-      const level = Array.from(cell.classList).find((c) => c.startsWith('level-'));
-      if (level) savedGridStateRef.current.set(key, level);
-    }
+    cellsMapRef.current.forEach(({ cell }, key) => {
+      if (cell) {
+        const level = Array.from(cell.classList).find((c) => c.startsWith('level-'));
+        if (level) savedGridStateRef.current.set(key, level);
+      }
+    });
   }, [ensureCellsCache]);
 
-  const checkWinCondition = useCallback((): boolean => {
-    if (mode === 'AUTOMODE') {
-      return !getTargetContribution(cellsMapRef.current, snakeRef.current[0]);
-    }
+  const checkWin = useCallback(() => {
+    if (mode === 'AUTOMODE')
+      return !getTargetContribution(
+        cellsMapRef.current,
+        snakeRef.current,
+        boardWidth,
+        boardHeight,
+        walls
+      );
     return !Array.from(cellsMapRef.current.values()).some(
       ({ cell }) =>
+        cell &&
         !cell.classList.contains('level-0') &&
         !cell.classList.contains('snake-body') &&
         !cell.classList.contains('snake-head')
     );
-  }, [mode]);
+  }, [mode, walls, boardWidth, boardHeight]);
 
-  const handleGameOver = useCallback((): void => {
+  const handleGameOver = useCallback(() => {
     if (sound) playGameOverSound();
     stopGame();
   }, [sound, playGameOverSound, stopGame]);
 
-  const handleWin = useCallback((): void => {
-    if (sound) playWinSound();
-    winGame();
-  }, [sound, playWinSound, winGame]);
+  const handleEating = useCallback(
+    (next: Position) => {
+      const cellData = cellsMapRef.current.get(`${next.x}-${next.y}`);
+      const isEat =
+        cellData?.cell &&
+        !cellData.cell.classList.contains('level-0') &&
+        !cellData.cell.classList.contains('snake-body');
 
-  const getTargetDir = useCallback(
-    (head: Position): Direction => {
-      const target = getTargetContribution(cellsMapRef.current, head);
-      if (!target) return dirRef.current;
-      return getAutoDirection(
-        head,
-        target,
-        dirRef.current,
-        snakeRef.current,
-        walls,
-        boardWidth,
-        boardHeight
-      );
-    },
-    [walls, boardWidth, boardHeight]
-  );
-
-  const getWrappedPosition = useCallback(
-    (next: Position): Position => {
-      return {
-        x: next.x < 0 ? boardWidth - 1 : next.x >= boardWidth ? 0 : next.x,
-        y: next.y < 0 ? boardHeight - 1 : next.y >= boardHeight ? 0 : next.y,
-      };
-    },
-    [boardWidth, boardHeight]
-  );
-
-  const moveSnake = useCallback((): Position | null => {
-    const head = { ...snakeRef.current[0] };
-    if (mode === 'AUTOMODE') dirRef.current = getTargetDir(head);
-
-    let next = getNextPosition(head, dirRef.current);
-    if (walls) {
-      if (isOutOfBounds(next, boardWidth, boardHeight)) return null;
-    } else {
-      next = getWrappedPosition(next);
-    }
-    return isCollision(next, snakeRef.current) ? null : next;
-  }, [mode, walls, boardWidth, boardHeight, getTargetDir, getWrappedPosition]);
-
-  const processCell = useCallback(
-    (pos: Position): boolean => {
-      const data = cellsMapRef.current.get(`${pos.x}-${pos.y}`);
-      if (!data) return false;
-      const { cell } = data;
-      const isTarget =
-        !cell.classList.contains('level-0') &&
-        !cell.classList.contains('snake-body') &&
-        !cell.classList.contains('snake-head');
-
-      if (!isTarget) return false;
-
-      cell.classList.remove('level-1', 'level-2', 'level-3', 'level-4');
-      cell.classList.add('level-0');
-      if (sound) playEatSound();
-      scoreRef.current += 10;
-      updateScore(scoreRef.current);
-      return true;
+      if (isEat && cellData?.cell) {
+        cellData.cell.classList.remove('level-1', 'level-2', 'level-3', 'level-4');
+        cellData.cell.classList.add('level-0');
+        if (sound) playEatSound();
+        scoreRef.current += 10;
+        updateScore(scoreRef.current);
+      }
+      return !!isEat;
     },
     [sound, playEatSound, updateScore]
   );
 
-  const tick = useCallback(
-    (time: number): void => {
-      if (gameState !== 'PLAYING') return;
+  const calculateNext = useCallback(
+    (head: Position): Position | null => {
+      let next = getNextPosition(head, dirRef.current);
+      if (walls) {
+        if (next.x < 0 || next.x >= boardWidth || next.y < 0 || next.y >= boardHeight) {
+          handleGameOver();
+          return null;
+        }
+      } else {
+        next = { x: (next.x + boardWidth) % boardWidth, y: (next.y + boardHeight) % boardHeight };
+      }
 
+      if (snakeRef.current.some((s) => s.x === next.x && s.y === next.y)) {
+        handleGameOver();
+        return null;
+      }
+      return next;
+    },
+    [walls, boardWidth, boardHeight, handleGameOver]
+  );
+
+  const updateDirForAutomode = useCallback(
+    (head: Position) => {
+      if (mode !== 'AUTOMODE') return;
+      const target = getTargetContribution(
+        cellsMapRef.current,
+        snakeRef.current,
+        boardWidth,
+        boardHeight,
+        walls
+      );
+      if (target) {
+        dirRef.current = getAutoDirection(
+          head,
+          target,
+          dirRef.current,
+          snakeRef.current,
+          walls,
+          boardWidth,
+          boardHeight
+        );
+      }
+    },
+    [mode, boardWidth, boardHeight, walls]
+  );
+
+  const processMovement = useCallback(() => {
+    const head = { ...snakeRef.current[0] };
+    updateDirForAutomode(head);
+    const next = calculateNext(head);
+    if (!next) return;
+
+    const isEat = handleEating(next);
+    const newSnake = [next, ...snakeRef.current];
+    if (!isEat || !grow) newSnake.pop();
+    snakeRef.current = newSnake;
+    drawState();
+  }, [grow, drawState, calculateNext, handleEating, updateDirForAutomode]);
+
+  const tick = useCallback(
+    (time: number) => {
+      if (gameState !== 'PLAYING') return;
       if (time - lastTickRef.current > speed) {
         lastTickRef.current = time;
         ensureCellsCache();
-        if (checkWinCondition()) {
-          handleWin();
+        if (checkWin()) {
+          if (sound) playWinSound();
+          winGame();
           return;
         }
-
-        const nextHead = moveSnake();
-        if (!nextHead) {
-          handleGameOver();
-          return;
-        }
-
-        const snake = [nextHead, ...snakeRef.current];
-        if (!processCell(nextHead) || !grow) snake.pop();
-
-        snakeRef.current = snake;
-        drawState();
+        processMovement();
       }
       reqRef.current = requestAnimationFrame(tick);
     },
-    [
-      gameState,
-      speed,
-      grow,
-      drawState,
-      handleGameOver,
-      handleWin,
-      ensureCellsCache,
-      checkWinCondition,
-      moveSnake,
-      processCell,
-    ]
+    [gameState, speed, sound, winGame, playWinSound, checkWin, ensureCellsCache, processMovement]
   );
 
   useEffect(() => {
     if (mode === 'AUTOMODE' || gameState !== 'PLAYING') return;
-    const onKeyDown = (e: KeyboardEvent): void => {
+    const onKey = (e: KeyboardEvent) => {
       const dir = KEYS_MAP[e.key];
       if (dir && dir !== OPPOSITES[dirRef.current]) {
         e.preventDefault();
         dirRef.current = dir;
       }
     };
-    window.addEventListener('keydown', onKeyDown, { passive: false });
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, [mode, gameState]);
 
   useEffect(() => {
     if (gameState !== 'PLAYING') {
-      if (gameState === 'IDLE' || gameState === 'GAME_OVER') clearSnakeDOM();
+      if (gameState !== 'WON') clearSnakeDOM();
       return;
     }
     lastTickRef.current = performance.now();
     reqRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (reqRef.current) cancelAnimationFrame(reqRef.current);
-    };
+    return () => cancelAnimationFrame(reqRef.current);
   }, [gameState, tick, clearSnakeDOM]);
 
   useEffect(() => {

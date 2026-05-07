@@ -41,7 +41,7 @@ describe('GitHubSnake', () => {
 
   it('renders correct grid dimensions', () => {
     const { container } = render(<GitHubSnake data={mockData} boardWidth={2} boardHeight={2} />);
-    const cells = container.querySelectorAll('.github-snake-cell');
+    const cells = container.querySelectorAll('.github-snake-grid .github-snake-cell');
     expect(cells.length).toBe(4);
   });
 });

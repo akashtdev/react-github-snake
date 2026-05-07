@@ -14,6 +14,7 @@ export interface SnakeContextState {
   sound: boolean;
   grow: boolean;
   showScore: boolean;
+  showHeader: boolean;
   score: number;
   boardWidth: number;
   boardHeight: number;
@@ -29,6 +30,7 @@ export interface SnakeContextActions {
   setSound: (on: boolean) => void;
   setGrow: (grow: boolean) => void;
   setShowScore: (show: boolean) => void;
+  setShowHeader: (show: boolean) => void;
   updateScore: (score: number) => void;
   setBoardWidth: (width: number) => void;
 }
@@ -51,4 +53,6 @@ export interface ContributionDay {
 
 export interface ContributionData {
   days: ContributionDay[];
+  userName?: string;
+  totalContributions?: number;
 }

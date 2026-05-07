@@ -1,156 +1,40 @@
 import { useCallback, useEffect, useState } from 'react';
-import { type ContributionData, GitHubSnake, SnakeProvider } from '../lib/index';
+import { SnakeProvider } from '../lib/context/SnakeContext';
+import type { ContributionData } from '../lib/index';
 import { Docs } from './Docs';
-import { ControlsToolbar, IdentityToolbar } from './Toolbar';
+import { CopyButton, DemoFooter, SyntaxHighlighter } from './Shared';
+import { ControlDashboard } from './Toolbar';
 import './demo.css';
 
-interface ApiWeek {
+interface ApiDay {
   date: string;
   contributionCount: number;
   contributionLevel: string;
 }
 
 interface ApiResponse {
-  contributions: ApiWeek[][];
+  contributions: ApiDay[][];
 }
 
-function mapContributionLevel(level: string): 0 | 1 | 2 | 3 | 4 {
-  switch (level) {
-    case 'NONE':
-      return 0;
-    case 'FIRST_QUARTILE':
-      return 1;
-    case 'SECOND_QUARTILE':
-      return 2;
-    case 'THIRD_QUARTILE':
-      return 3;
-    default:
-      return 4;
-  }
-}
+const mapLevel = (l: string): 0 | 1 | 2 | 3 | 4 => {
+  const levels: Record<string, 0 | 1 | 2 | 3 | 4> = {
+    NONE: 0,
+    FIRST_QUARTILE: 1,
+    SECOND_QUARTILE: 2,
+    THIRD_QUARTILE: 3,
+    FOURTH_QUARTILE: 4,
+  };
+  return levels[l] ?? 0;
+};
 
-function SyntaxHighlighter({ code }: { code: string }) {
-  const parts = code.split(/(\s+|[{}(),;=<>/!]|['"].*?['"]|\d+)/);
-  return (
-    <code>
-      {parts.map((part, i) => {
-        if (/^(import|from|function|return|interface|const|export|type)$/.test(part)) {
-          return (
-            <span key={`${i}-${part}`} className="syntax-k">
-              {part}
-            </span>
-          );
-        }
-        if (
-          /^(GitHubSnake|SnakeProvider|ContributionData|GitHubSnakeLabels|App|GameControls|button|SnakeContext|string|number|boolean)$/.test(
-            part
-          )
-        ) {
-          return (
-            <span key={`${i}-${part}`} className="syntax-t">
-              {part}
-            </span>
-          );
-        }
-        if (
-          /^(useSnakeContext|startGame|setMode|createRoot|render|getElementById|fetch|useWidth|useCallback|useEffect|useMemo|useState|use)$/.test(
-            part
-          )
-        ) {
-          return (
-            <span key={`${i}-${part}`} className="syntax-f">
-              {part}
-            </span>
-          );
-        }
-        if (/^['"].*?['"]$/.test(part)) {
-          return (
-            <span key={`${i}-${part}`} className="syntax-s">
-              {part}
-            </span>
-          );
-        }
-        if (
-          /^(theme|initialMode|initialSpeed|initialWalls|initialSound|initialGrow|blockSize|blockMargin|labels|data|responsive|initialShowScore|className|style|onClick|start|gameOver|won|restart|score|days|date|count|level)$/.test(
-            part
-          )
-        ) {
-          return (
-            <span key={`${i}-${part}`} className="syntax-v">
-              {part}
-            </span>
-          );
-        }
-        if (/^\d+$/.test(part)) {
-          return (
-            <span key={`${i}-${part}`} className="syntax-number">
-              {part}
-            </span>
-          );
-        }
-        return part;
-      })}
-    </code>
-  );
-}
-
-function CopyButton({
-  text,
-  index,
-  copiedIndex,
-  onCopy,
-}: {
-  text: string;
-  index: number;
-  copiedIndex: number | null;
-  onCopy: (text: string, index: number) => void;
-}) {
-  const isCopied = copiedIndex === index;
-  return (
-    <button
-      type="button"
-      className="copy-btn"
-      onClick={() => onCopy(text, index)}
-      title={isCopied ? 'Copied!' : 'Copy to clipboard'}
-      aria-label={isCopied ? 'Copied' : 'Copy code'}
-    >
-      {isCopied ? (
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          role="img"
-          aria-label="Copied"
-        >
-          <title>Copied</title>
-          <polyline points="20 6 9 17 4 12" />
-        </svg>
-      ) : (
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          role="img"
-          aria-label="Copy code"
-        >
-          <title>Copy code</title>
-          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-        </svg>
-      )}
-    </button>
-  );
-}
+const CodeBlock = ({ code }: { code: string }) => (
+  <div className="code-block">
+    <pre>
+      <SyntaxHighlighter code={code} />
+    </pre>
+    <CopyButton text={code} />
+  </div>
+);
 
 function AppContent() {
   const [username, setUsername] = useState('akashtdev');
@@ -158,14 +42,20 @@ function AppContent() {
   const [error, setError] = useState<string | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [loading, setLoading] = useState(false);
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [showDocs, setShowDocs] = useState(false);
+  const [columns, setColumns] = useState<number>(53);
+  const [showLabels, setShowLabels] = useState(true);
+  const [showLegend, setShowLegend] = useState(true);
+  const [scrollable, setScrollable] = useState(false);
+  const [autoColumns, setAutoColumns] = useState(true);
 
-  const handleCopy = useCallback((text: string, index: number) => {
-    navigator.clipboard.writeText(text);
-    setCopiedIndex(index);
-    setTimeout(() => setCopiedIndex(null), 2000);
-  }, []);
+  const enrichedData = data
+    ? {
+        ...data,
+        userName: username,
+        totalContributions: data.days.reduce((a, b) => a + b.count, 0),
+      }
+    : undefined;
 
   const fetchGraph = useCallback(async (user: string) => {
     if (!user) return;
@@ -173,299 +63,227 @@ function AppContent() {
     setError(null);
     try {
       const res = await fetch(`https://github-contributions-api.deno.dev/${user}.json`);
-      if (res.ok) {
-        const json = (await res.json()) as ApiResponse;
-        if (!json.contributions || json.contributions.length === 0) {
-          throw new Error('No contribution data found.');
-        }
-        const days = json.contributions.flatMap((week) =>
-          week.map((day) => ({
-            date: day.date,
-            count: day.contributionCount,
-            level: mapContributionLevel(day.contributionLevel),
-          }))
-        );
-        setData({ days });
-      } else {
-        throw new Error(`Failed to fetch data for ${user}`);
-      }
-    } catch (e: unknown) {
-      console.error(e);
+      if (!res.ok) throw new Error(`Failed to fetch data for ${user}`);
+      const json = (await res.json()) as ApiResponse;
+      const days = json.contributions.flatMap((w) =>
+        w.map((d) => ({
+          date: d.date,
+          count: d.contributionCount,
+          level: mapLevel(d.contributionLevel),
+        }))
+      );
+      setData({ days });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Could not fetch GitHub graph.';
       setData(undefined);
-      setError(e instanceof Error ? e.message : 'Could not fetch GitHub graph.');
+      setError(message);
     } finally {
       setLoading(false);
     }
   }, []);
-
-  const handleFetch = useCallback(() => {
-    fetchGraph(username);
-  }, [username, fetchGraph]);
 
   useEffect(() => {
     fetchGraph(username);
   }, [fetchGraph, username]);
 
   useEffect(() => {
-    if (theme === 'dark') {
-      document.body.classList.add('theme-dark');
-    } else {
-      document.body.classList.remove('theme-dark');
-    }
+    document.body.classList.toggle('theme-dark', theme === 'dark');
   }, [theme]);
-
-  if (showDocs) {
-    return (
-      <Docs
-        onBack={() => {
-          setShowDocs(false);
-          window.scrollTo(0, 0);
-        }}
-      />
-    );
-  }
 
   return (
     <div className="demo-page">
-      <header className="demo-header">
-        <h1>GitHub Heatmap Snake</h1>
-        <p>
-          React component that transforms a GitHub contribution graph into a playable Snake game.
-        </p>
-      </header>
-
-      <main className="demo-console">
-        <IdentityToolbar
-          username={username}
-          setUsername={setUsername}
-          onFetch={handleFetch}
-          theme={theme}
-          setTheme={setTheme}
-          loading={loading}
+      {showDocs ? (
+        <Docs
+          onBack={() => {
+            setShowDocs(false);
+            window.scrollTo(0, 0);
+          }}
         />
-
-        <div className="demo-game-container">
-          {error ? (
-            <div className="demo-error-message">
-              <p>{error}</p>
-              <span className="demo-error-hint">Make sure the username is correct.</span>
+      ) : (
+        <>
+          <header className="demo-header">
+            <div className="section-inner">
+              <h1>GitHub Heatmap Snake</h1>
+              <p>
+                A technical React component for transforming contribution data into interactive
+                games.
+              </p>
             </div>
-          ) : (
-            <GitHubSnake data={data} theme={theme} blockSize={13} blockMargin={3} responsive />
-          )}
-        </div>
+          </header>
 
-        <ControlsToolbar />
-      </main>
-
-      <footer className="demo-footer">
-        <div className="setup-guide">
-          <div className="setup-header">
-            <h2>Quick Setup</h2>
-            <p>Get started with GitHub Heatmap Snake in your React project</p>
-          </div>
-
-          <div className="setup-steps">
-            <div className="setup-step">
-              <div className="step-header">
-                <div className="step-number">1</div>
-                <h3>Install</h3>
-              </div>
-              <div className="code-block">
-                <pre>
-                  <SyntaxHighlighter code="npm install react-github-snake" />
-                </pre>
-                <CopyButton
-                  text="npm install react-github-snake"
-                  index={1}
-                  copiedIndex={copiedIndex}
-                  onCopy={handleCopy}
-                />
-              </div>
+          <main className="demo-console">
+            <div className="section-inner">
+              <ControlDashboard
+                username={username}
+                setUsername={setUsername}
+                onFetch={() => fetchGraph(username)}
+                theme={theme}
+                setTheme={setTheme}
+                loading={loading}
+                columns={columns}
+                setColumns={setColumns}
+                showLabels={showLabels}
+                setShowLabels={setShowLabels}
+                showLegend={showLegend}
+                setShowLegend={setShowLegend}
+                scrollable={scrollable}
+                setScrollable={setScrollable}
+                autoColumns={autoColumns}
+                setAutoColumns={setAutoColumns}
+                error={error}
+                data={enrichedData}
+              />
             </div>
+          </main>
 
-            <div className="setup-step">
-              <div className="step-header">
-                <div className="step-number">2</div>
-                <h3>Import and Use</h3>
+          <footer className="demo-footer">
+            <div className="setup-guide">
+              <section className="full-width-divider">
+                <div className="section-inner" style={{ background: 'transparent' }}>
+                  <div className="setup-header">
+                    <h2>Quick Setup</h2>
+                    <p>Integrate the engine into your project</p>
+                  </div>
+                </div>
+              </section>
+
+              <div className="setup-steps">
+                <section>
+                  <div className="section-inner">
+                    <div className="setup-step">
+                      <div className="step-info">
+                        <div className="step-number">1</div>
+                        <h3>Install</h3>
+                      </div>
+                      <div className="step-content">
+                        <CodeBlock code="npm install react-github-snake" />
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section>
+                  <div className="section-inner">
+                    <div className="setup-step">
+                      <div className="step-info">
+                        <div className="step-number">2</div>
+                        <h3>Import</h3>
+                      </div>
+                      <div className="step-content">
+                        <CodeBlock
+                          code={`import { GitHubSnake } from 'react-github-snake';\nimport 'react-github-snake/style.css';`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section>
+                  <div className="section-inner">
+                    <div className="setup-step">
+                      <div className="step-info">
+                        <div className="step-number">3</div>
+                        <h3>Render</h3>
+                      </div>
+                      <div className="step-content">
+                        <CodeBlock code={`<GitHubSnake theme="dark" initialMode="AUTOMODE" />`} />
+                      </div>
+                    </div>
+                  </div>
+                </section>
               </div>
-              <div className="code-block">
-                <pre>
-                  <SyntaxHighlighter
-                    code={`import { GitHubSnake } from 'react-github-snake';
-import 'react-github-snake/style.css';
 
-function App() {
-  return (
-    <GitHubSnake
-      theme="dark"
-      initialMode="AUTOMODE"
-      initialSpeed={80}
-    />
-  );
-}`}
-                  />
-                </pre>
-                <CopyButton
-                  text={`import { GitHubSnake } from 'react-github-snake';
-import 'react-github-snake/style.css';
-
-function App() {
-  return (
-    <GitHubSnake
-      theme="dark"
-      initialMode="AUTOMODE"
-      initialSpeed={80}
-    />
-  );
-}`}
-                  index={2}
-                  copiedIndex={copiedIndex}
-                  onCopy={handleCopy}
-                />
-              </div>
+              <section className="full-width-divider bottom">
+                <div className="section-inner">
+                  <div className="setup-links-grid">
+                    <div className="setup-link-cell">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowDocs(true);
+                          window.scrollTo(0, 0);
+                        }}
+                        className="setup-link"
+                      >
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                        >
+                          <title>Documentation</title>
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                          <polyline points="14 2 14 8 20 8" />
+                          <line x1="16" y1="13" x2="8" y2="13" />
+                          <line x1="16" y1="17" x2="8" y2="17" />
+                          <polyline points="10 9 9 9 8 9" />
+                        </svg>
+                        Full Documentation
+                      </button>
+                    </div>
+                    <div className="setup-link-cell">
+                      <a
+                        href="https://github.com/akashtdev/react-github-snake"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="setup-link"
+                      >
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                        >
+                          <title>GitHub Repository</title>
+                          <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
+                        </svg>
+                        Star on GitHub
+                      </a>
+                    </div>
+                    <div className="setup-link-cell">
+                      <a
+                        href="https://www.npmjs.com/package/react-github-snake"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="setup-link"
+                      >
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                        >
+                          <title>NPM Package</title>
+                          <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2" />
+                          <line x1="12" y1="22" x2="12" y2="15.5" />
+                          <polyline points="22 8.5 12 15.5 2 8.5" />
+                          <polyline points="2 15.5 12 8.5 22 15.5" />
+                          <line x1="12" y1="2" x2="12" y2="8.5" />
+                        </svg>
+                        NPM Package
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </section>
             </div>
-
-            <div className="setup-step">
-              <div className="step-header">
-                <div className="step-number">3</div>
-                <h3>Customize (Optional)</h3>
-              </div>
-              <div className="code-block">
-                <pre>
-                  <SyntaxHighlighter
-                    code={`<GitHubSnake
-  theme="light"
-  initialMode="MANUAL"
-  initialSpeed={100}
-  initialWalls={false}
-  initialSound={true}
-  initialGrow={false}
-  blockSize={15}
-  blockMargin={4}
-/>`}
-                  />
-                </pre>
-                <CopyButton
-                  text={`<GitHubSnake
-  theme="light"
-  initialMode="MANUAL"
-  initialSpeed={100}
-  initialWalls={false}
-  initialSound={true}
-  initialGrow={false}
-  blockSize={15}
-  blockMargin={4}
-/>`}
-                  index={3}
-                  copiedIndex={copiedIndex}
-                  onCopy={handleCopy}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="setup-links">
-            <button
-              type="button"
-              onClick={() => {
-                setShowDocs(true);
-                window.scrollTo(0, 0);
-              }}
-              className="setup-link"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
-                fill="none"
-                role="img"
-                aria-label="Documentation"
-              >
-                <title>Documentation</title>
-                <path
-                  d="M2 5.5C2 4.67157 2.67157 4 3.5 4H12.5C13.3284 4 14 4.67157 14 5.5V12.5C14 13.3284 13.3284 14 12.5 14H3.5C2.67157 14 2 13.3284 2 12.5V5.5Z"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                />
-                <path d="M5 7H11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                <path d="M5 9.5H9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                <path
-                  d="M4 4V2.5C4 2.22386 4.22386 2 4.5 2H11.5C11.7761 2 12 2.22386 12 2.5V4"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                />
-              </svg>
-              Full Documentation
-            </button>
-            <a
-              href="https://www.npmjs.com/package/react-github-snake"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="setup-link"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
-                fill="none"
-                role="img"
-                aria-label="NPM"
-              >
-                <title>NPM Package</title>
-                <path
-                  d="M2.5 4.5H13.5V11.5H8V13H5.5V11.5H2.5V4.5Z"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M5.5 7V9.5"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-                <path d="M8 7V9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                <path
-                  d="M10.5 7V9.5"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-              NPM Package
-            </a>
-          </div>
-        </div>
-
-        <div className="footer-links">
-          <a
-            href="https://github.com/akashtdev/react-github-snake"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="footer-link"
-          >
-            Star on GitHub
-          </a>
-          <span className="footer-dot" />
-          <a
-            href="https://twitter.com/akashtdev"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="footer-link"
-          >
-            Follow on Twitter
-          </a>
-        </div>
-        <p className="footer-copy">Built with ❤️ by akashtdev</p>
-      </footer>
+          </footer>
+          <DemoFooter />
+        </>
+      )}
     </div>
   );
 }
 
 export function App() {
   return (
-    <SnakeProvider initialMode="MANUAL" initialSpeed={80} initialWalls={false}>
+    <SnakeProvider initialMode="MANUAL" initialSpeed={80}>
       <AppContent />
     </SnakeProvider>
   );

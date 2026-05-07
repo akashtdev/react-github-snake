@@ -1,12 +1,14 @@
 .github-snake-container {
-  display: inline-block;
+  display: block;
+  width: 100%;
+  max-width: fit-content;
+  margin: 0 auto;
   position: relative;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   user-select: none;
   --cell-size: 15px;
   --cell-gap: 4px;
 
-  /* Light Theme Colors (GitHub Palette) */
   --bg-color: #ffffff;
   --bg-rgb: 255, 255, 255;
   --text-color: #24292f;
@@ -18,12 +20,11 @@
 
   --snake-head: #1f2328;
   --snake-body: #57606a;
-  --snake-head-radius: 4px;
-  --snake-body-radius: 2px;
+  --snake-head-radius: 0;
+  --snake-body-radius: 0;
 
   background-color: var(--bg-color);
-  padding: 12px;
-  border-radius: 8px;
+  padding: 16px;
   border: 1px solid rgba(0, 0, 0, 0.1);
   overflow: hidden;
   color-scheme: light dark;
@@ -47,7 +48,20 @@
 .github-snake-grid {
   display: flex;
   gap: var(--cell-gap);
-  transition: opacity 0.3s ease;
+  transition: opacity 0.3s ease, filter 0.3s ease;
+}
+
+.github-snake-container:not(.is-playing):hover .github-snake-grid,
+.github-snake-container.is-game-over .github-snake-grid,
+.github-snake-container.is-won .github-snake-grid {
+  filter: blur(4px);
+}
+
+.github-snake-container:not(.is-playing):hover .github-snake-overlay,
+.github-snake-container.is-game-over .github-snake-overlay,
+.github-snake-container.is-won .github-snake-overlay {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .github-snake-col {
@@ -59,7 +73,7 @@
 .github-snake-cell {
   width: var(--cell-size);
   height: var(--cell-size);
-  border-radius: 2px;
+  border-radius: 0;
   outline: 1px solid rgba(27, 31, 35, 0.06);
   outline-offset: -1px;
   transition: transform 0.2s ease;
@@ -106,40 +120,35 @@
 }
 
 .github-snake-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(var(--bg-rgb), 0.7);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 0.3s ease;
   z-index: 20;
-  overscroll-behavior: contain;
+  background: rgba(var(--bg-rgb), 0.4);
 }
 
-.github-snake-container:not(.is-playing):hover
-  .github-snake-overlay:not(.is-game-over):not(.is-won) {
-  opacity: 1;
-  pointer-events: auto;
+.github-snake-grid-container .github-snake-overlay {
+  position: absolute;
+  inset: 0;
 }
 
-.github-snake-overlay.is-game-over,
-.github-snake-overlay.is-won {
-  opacity: 1;
-  pointer-events: auto;
-  background: rgba(var(--bg-rgb), 0.85);
+.is-scrollable .github-snake-overlay {
+  position: sticky;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .overlay-content {
   text-align: center;
-  padding: 24px;
+  padding: 16px;
   color: var(--text-color);
   animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-  max-width: 80%;
+  max-width: 90%;
 }
 
 @keyframes slideUp {
@@ -159,10 +168,10 @@
   background-color: var(--btn-bg);
   color: var(--btn-text);
   border: 1px solid rgba(27, 31, 35, 0.15);
-  padding: 8px 20px;
-  border-radius: 6px;
+  padding: 6px 16px;
+  border-radius: 0;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 12px;
   cursor: pointer;
   transition: filter 0.2s, transform 0.1s, box-shadow 0.2s;
   box-shadow: 0 1px 0 rgba(27, 31, 35, 0.1);
@@ -180,30 +189,30 @@
 }
 
 .github-snake-btn:focus-visible {
-  outline: 2px solid #0969da;
+  outline: 2px solid var(--snake-head);
   outline-offset: 2px;
 }
 
 .game-won-text {
   color: #2da44e;
-  font-size: 28px;
+  font-size: 18px;
   font-weight: 800;
-  margin: 0 0 8px 0;
+  margin: 0 0 4px 0;
   text-shadow: 0 2px 10px rgba(45, 164, 78, 0.2);
   text-wrap: balance;
 }
 
 .game-over-text {
-  margin: 0 0 8px 0;
-  font-size: 24px;
+  margin: 0 0 4px 0;
+  font-size: 18px;
   font-weight: 700;
   color: var(--text-color);
   text-wrap: balance;
 }
 
 .score-text {
-  margin: 0 0 20px 0;
-  font-size: 16px;
+  margin: 0 0 12px 0;
+  font-size: 13px;
   opacity: 0.8;
 }
 
@@ -215,7 +224,7 @@
 
 .score-hud {
   position: absolute;
-  top: 8px;
+  top: 12px;
   right: 12px;
   font-size: 11px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -225,9 +234,119 @@
   pointer-events: none;
   background: rgba(var(--bg-rgb), 0.5);
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: 0;
   backdrop-filter: blur(4px);
   font-variant-numeric: tabular-nums;
+  z-index: 30;
+}
+
+/* ─── Premium Card Elements ─── */
+.github-snake-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+  color: var(--text-color);
+}
+
+.header-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.user-label {
+  font-weight: 700;
+}
+
+.user-separator {
+  opacity: 0.3;
+  font-weight: 400;
+}
+
+.user-handle {
+  opacity: 0.7;
+  font-weight: 500;
+}
+
+.github-snake-scroll-area {
+  position: relative;
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  display: grid;
+  grid-template-areas: "content";
+  justify-items: center;
+}
+
+.github-snake-scroll-area::-webkit-scrollbar {
+  display: none;
+}
+
+.github-snake-board-wrapper {
+  grid-area: content;
+  display: inline-block;
+  min-width: 100%;
+  margin: 0 auto;
+}
+
+.is-scrollable .github-snake-overlay {
+  grid-area: content;
+  padding-top: var(--labels-height, 0);
+  box-sizing: border-box;
+}
+
+.github-snake-months {
+  position: relative;
+  height: 20px;
+  margin-bottom: 8px;
+}
+
+.month-label {
+  position: absolute;
+  top: 0;
+  font-size: 11px;
+  color: var(--text-color);
+  opacity: 0.5;
+  white-space: nowrap;
+}
+
+.github-snake-footer {
+  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--text-color);
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0.8;
+}
+
+.legend span {
+  font-size: 11px;
+}
+
+.legend-cells {
+  display: flex;
+  gap: 3px;
+}
+
+.legend-cells .github-snake-cell {
+  width: 10px;
+  height: 10px;
+  border-radius: 0;
+}
+
+.contribution-count {
+  opacity: 0.8;
 }
 
 @media (prefers-reduced-motion: reduce) {

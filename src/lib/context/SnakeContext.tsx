@@ -19,6 +19,7 @@ interface SnakeProviderProps {
   initialSound?: boolean;
   initialGrow?: boolean;
   initialShowScore?: boolean;
+  initialShowHeader?: boolean;
   boardWidth?: number;
   boardHeight?: number;
 }
@@ -31,6 +32,7 @@ export function SnakeProvider({
   initialSound = true,
   initialGrow = false,
   initialShowScore = true,
+  initialShowHeader = true,
   boardWidth: boardWidthProp = 53,
   boardHeight = 7,
 }: SnakeProviderProps) {
@@ -41,6 +43,7 @@ export function SnakeProvider({
   const [sound, setSound] = useState<boolean>(initialSound);
   const [grow, setGrow] = useState<boolean>(initialGrow);
   const [showScore, setShowScore] = useState<boolean>(initialShowScore);
+  const [showHeader, setShowHeader] = useState<boolean>(initialShowHeader);
   const [score, setScore] = useState<number>(0);
   const [boardWidth, setBoardWidth] = useState<number>(boardWidthProp);
 
@@ -69,6 +72,10 @@ export function SnakeProvider({
   }, [initialShowScore]);
 
   useEffect(() => {
+    setShowHeader(initialShowHeader);
+  }, [initialShowHeader]);
+
+  useEffect(() => {
     setBoardWidth(boardWidthProp);
   }, [boardWidthProp]);
 
@@ -94,6 +101,7 @@ export function SnakeProvider({
       sound,
       grow,
       showScore,
+      showHeader,
       score,
       boardWidth,
       boardHeight,
@@ -105,6 +113,7 @@ export function SnakeProvider({
       setSound,
       setGrow,
       setShowScore,
+      setShowHeader,
       winGame,
       updateScore: setScore,
       setBoardWidth,
@@ -117,6 +126,7 @@ export function SnakeProvider({
       sound,
       grow,
       showScore,
+      showHeader,
       score,
       boardWidth,
       boardHeight,

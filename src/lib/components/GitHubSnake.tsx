@@ -1,4 +1,4 @@
-import { memo, use, useEffect, useMemo, useState } from 'react';
+import { memo, useContext, useEffect, useMemo } from 'react';
 import { SnakeContext, SnakeProvider } from '../context/SnakeContext';
 import { useWidth } from '../hooks/useWidth';
 import type { ContributionData, GameMode, GitHubSnakeLabels } from '../types';
@@ -16,18 +16,17 @@ export interface GitHubSnakeProps {
   initialSound?: boolean;
   initialGrow?: boolean;
   initialShowScore?: boolean;
+  initialShowHeader?: boolean;
   blockSize?: number;
   blockMargin?: number;
   labels?: GitHubSnakeLabels;
   className?: string;
   style?: React.CSSProperties;
-  /**
-   * When true, the component automatically adjusts the number of visible
-   * columns to fit the available container width. Older columns (left side)
-   * are trimmed first, keeping the most recent data visible.
-   * @default false
-   */
   responsive?: boolean;
+  columns?: number;
+  showLabels?: boolean;
+  showLegend?: boolean;
+  scrollable?: boolean;
 }
 
 const WRAPPER_STYLE: React.CSSProperties = { display: 'inline-block' };
@@ -49,58 +48,51 @@ export const GitHubSnake = memo(function GitHubSnake({
   initialSound = true,
   initialGrow = false,
   initialShowScore = true,
+  initialShowHeader = true,
   blockSize = 15,
   blockMargin = 4,
   labels,
   className,
   style,
   responsive = false,
+  columns,
+  showLabels = true,
+  showLegend = true,
+  scrollable = false,
 }: GitHubSnakeProps) {
-  const existingContext = use(SnakeContext);
+  const existingContext = useContext(SnakeContext);
   const [wrapperRef, availableWidth] = useWidth();
-  const [measuredCols, setMeasuredCols] = useState<number | null>(null);
-
-  const validatedBoardWidth = Math.max(1, Math.min(boardWidth, 100));
+  const validatedBoardWidth = Math.max(1, Math.min(boardWidth, 53));
   const validatedBoardHeight = Math.max(1, Math.min(boardHeight, 20));
   const validatedSpeed = Math.max(10, initialSpeed);
 
-  useEffect(() => {
-    if (!responsive || availableWidth <= 0) {
-      setMeasuredCols(null);
-      return;
-    }
-    const innerChrome = 30;
-    const effectiveWidth = availableWidth - innerChrome;
-    if (effectiveWidth <= 0) {
-      setMeasuredCols(1);
-      return;
-    }
+  const measuredCols = useMemo(() => {
+    if (!responsive || availableWidth <= 0) return null;
     const colUnit = blockSize + blockMargin;
-    const fitCols = Math.max(1, Math.floor((effectiveWidth + blockMargin) / colUnit));
-    setMeasuredCols(Math.min(fitCols, validatedBoardWidth));
+    const fitCols = Math.max(1, Math.floor((availableWidth - 30 + blockMargin) / colUnit));
+    return Math.min(fitCols, validatedBoardWidth);
   }, [responsive, availableWidth, blockSize, blockMargin, validatedBoardWidth]);
 
   const dataWeeks = data?.days
     ? Math.ceil(data.days.length / validatedBoardHeight)
     : validatedBoardWidth;
 
-  const effectiveBoardWidth = responsive
-    ? Math.min(measuredCols ?? Math.min(10, validatedBoardWidth), validatedBoardWidth, dataWeeks)
-    : Math.min(validatedBoardWidth, dataWeeks);
+  const effectiveBoardWidth = columns
+    ? Math.min(columns, dataWeeks)
+    : responsive && !scrollable
+      ? Math.min(measuredCols ?? 10, validatedBoardWidth, dataWeeks)
+      : Math.min(validatedBoardWidth, dataWeeks);
 
-  const slicedData = useMemo((): ContributionData | undefined => {
-    if (!data?.days) return data;
-    if (effectiveBoardWidth >= dataWeeks) return data;
-
-    const weeksToSkip = dataWeeks - effectiveBoardWidth;
-    const daysToSkip = weeksToSkip * validatedBoardHeight;
-    return { days: data.days.slice(daysToSkip) };
+  const slicedData = useMemo(() => {
+    if (!data?.days || effectiveBoardWidth >= dataWeeks) return data;
+    return {
+      ...data,
+      days: data.days.slice((dataWeeks - effectiveBoardWidth) * validatedBoardHeight),
+    };
   }, [data, effectiveBoardWidth, dataWeeks, validatedBoardHeight]);
 
   useEffect(() => {
-    if (existingContext) {
-      existingContext.setBoardWidth(effectiveBoardWidth);
-    }
+    if (existingContext) existingContext.setBoardWidth(effectiveBoardWidth);
   }, [existingContext, effectiveBoardWidth]);
 
   const content = (
@@ -111,28 +103,24 @@ export const GitHubSnake = memo(function GitHubSnake({
       labels={labels}
       colorScheme={theme}
       className={className}
+      showLabels={showLabels}
+      showLegend={showLegend}
+      scrollable={scrollable}
       style={style}
     />
   );
 
-  if (existingContext) {
+  const wrapperStyle = responsive ? RESPONSIVE_WRAPPER_STYLE : WRAPPER_STYLE;
+
+  if (existingContext)
     return (
-      <div
-        className="github-snake-wrapper"
-        style={responsive ? RESPONSIVE_WRAPPER_STYLE : WRAPPER_STYLE}
-        ref={wrapperRef}
-      >
+      <div className="github-snake-wrapper" style={wrapperStyle} ref={wrapperRef}>
         {content}
       </div>
     );
-  }
 
   return (
-    <div
-      className="github-snake-wrapper"
-      style={responsive ? RESPONSIVE_WRAPPER_STYLE : WRAPPER_STYLE}
-      ref={wrapperRef}
-    >
+    <div className="github-snake-wrapper" style={wrapperStyle} ref={wrapperRef}>
       <SnakeProvider
         initialMode={initialMode}
         initialSpeed={validatedSpeed}
@@ -140,6 +128,7 @@ export const GitHubSnake = memo(function GitHubSnake({
         initialSound={initialSound}
         initialGrow={initialGrow}
         initialShowScore={initialShowScore}
+        initialShowHeader={initialShowHeader}
         boardWidth={effectiveBoardWidth}
         boardHeight={validatedBoardHeight}
       >

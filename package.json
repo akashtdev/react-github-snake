@@ -1,6 +1,6 @@
 {
   "name": "react-github-snake",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "An interactive GitHub contribution snake game for React with automated pathfinding.",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -21,7 +21,7 @@
   "sideEffects": ["*.css"],
   "scripts": {
     "dev": "vite",
-    "build": "tsup",
+    "build": "bun run check && bun run typecheck && tsup",
     "build:demo": "vite build",
     "test": "vitest",
     "test:run": "vitest run",
@@ -29,8 +29,8 @@
     "preview": "vite preview",
     "check": "biome check --write .",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist dist-demo",
-    "prepublishOnly": "npm run build"
+    "clean": "rm -rf dist dist-demo node_modules bun.lock package-lock.json yarn.lock pnpm-lock.yaml coverage && bun install",
+    "prepublishOnly": "bun run clean && bun run build && bun run test:run"
   },
   "peerDependencies": {
     "react": ">=19.0.0",

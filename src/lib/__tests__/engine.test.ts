@@ -92,8 +92,8 @@ describe('Game Logic Utilities', () => {
         }
       }
 
-      const head: Position = { x: 4, y: 4 };
-      const target = getTargetContribution(cellsMap, head);
+      const snake: Position[] = [{ x: 4, y: 4 }];
+      const target = getTargetContribution(cellsMap, snake, 53, 7, false);
 
       expect(target).toEqual({ x: 5, y: 5 });
     });
@@ -116,8 +116,8 @@ describe('Game Logic Utilities', () => {
         }
       }
 
-      const head: Position = { x: 0, y: 0 };
-      expect(getTargetContribution(cellsMap, head)).toBeNull();
+      const snake: Position[] = [{ x: 0, y: 0 }];
+      expect(getTargetContribution(cellsMap, snake, 53, 7, false)).toBeNull();
     });
   });
 });
